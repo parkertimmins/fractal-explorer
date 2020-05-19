@@ -1,17 +1,37 @@
 
+let juliaC = {
+	x: getFloat('julia-c-re'),
+	y: getFloat('julia-c-im')
+};	
 
-// global state
-let ul_screen = { x: -1.5, y: 1.5 };
-let width_screen = 3;
+function getInt(id) {
+	return parseInt(document.getElementById(id).value);
+}
 
-const C = { x: -1, y: 0};
-const max_iter = 300;
-const R = (1 + Math.sqrt(1 + 4 * norm(C))) / 2
+function getFloat(id) {
+	return parseFloat(document.getElementById(id).value);
+}
+
+let state = {
+	ul_screen: { x: -1.5, y: 1.5 },
+	width_screen: 3,
+	set_estimator_function: mandelbrot_estimator,
+	max_iterations: getInt('max-iterations'),
+	julia: {
+		C: juliaC,
+		R: juliaR(juliaC)
+	}
+}
+
+function juliaR(C) {
+	return (1 + Math.sqrt(1 + 4 * norm(C))) / 2
+}
 
 function norm(z) {
     return Math.sqrt(z.x * z.x + z.y * z.y);
 }
 
+// f(z, c) = z^2 + c
 function f(z, c) {
     let x = (z.x * z.x) - (z.y * z.y) + c.x;
     let y = (2 * z.x * z.y) + c.y; 
@@ -19,8 +39,9 @@ function f(z, c) {
 }
 
 // returns num iteration to find not in set, or null if in set
-function in_set_estimator(start, update_func, threshold) {
+function in_set_estimator(start, update_func, threshold, max_iter) {
     let z = start;
+	
     for (let i = 0; i < max_iter; i++) {
         z = update_func(z) 
         if (norm(z) > threshold) {
@@ -31,22 +52,12 @@ function in_set_estimator(start, update_func, threshold) {
 }
 
 function mandelbrot_estimator(c) {
-    return in_set_estimator({x: 0, y:0}, f_n_0 => f(f_n_0, c), 2);
+    return in_set_estimator({x: 0, y:0}, f_n_0 => f(f_n_0, c), 2, state.max_iterations);
 }
 
 function julia_estimator(z) {
-    return in_set_estimator(z, z => f(z, C), R);
+    return in_set_estimator(z, z => f(z, state.julia.C), state.julia.R, state.max_iterations); 
 }
-
-function draw_pixel(ctx, color, r, c) {
-    ctx.fillStyle = rgb(color.r, color.g, color.b)
-    ctx.fillRect(c, r, 1, 1);
-}
-
-function rgb(r, g, b) {
-    return `rgb(${r}, ${g}, ${b})`;
-}
-
 
 function compute_pixel_values() {
 	let startTime = new Date().getTime();
@@ -55,7 +66,7 @@ function compute_pixel_values() {
     const ctx = canvas.getContext('2d');
     const height_px = canvas.height;
     const width_px = canvas.width;
-    const height_screen = (width_screen * height_px) / width_px;
+    const height_screen = (state.width_screen * height_px) / width_px;
 
 	let px_values = [];
 	let unique_values = new Set();
@@ -64,8 +75,7 @@ function compute_pixel_values() {
 		let row = []
     	for (let c = 0; c < width_px; c++) {
             let z = pixel_to_point({r, c}); 
-            let iterations_to_escape = mandelbrot_estimator(z)
-            //console.log(iterations_to_escape);
+            let iterations_to_escape = state.set_estimator_function(z)
 				
 			row.push(iterations_to_escape);           	
 			
@@ -89,13 +99,9 @@ function animate() {
 	
 	let color1 = hexToRgb(document.getElementById('out-set-color1').value);
 	let color2 = hexToRgb(document.getElementById('out-set-color2').value);
-
 	let iterToColor = getIterationToColor(color1, color2, unique_values);
 	
-	console.log('iterToColor', iterToColor);	
-	
-	drawImage(px_values, iterToColor);
-	//drawFullImage(px_values, iterToColor);
+	drawFullImage(px_values, iterToColor);
 	
 	let endTime = new Date().getTime();
 	console.log('animate() time', (endTime - startTime));
@@ -107,14 +113,13 @@ function getIterationToColor(color1, color2, unique_values) {
 		let singleIterVal = unique_values.values().next().value;
 	 	iterToColor[singleIterVal] = color2;
 	} else if (unique_values.size >= 2) {
-		let min_iterations = Math.min(...unique_values);
-		let max_iterations = Math.max(...unique_values);
+		let least_iterations = Math.min(...unique_values);
+		let most_iterations = Math.max(...unique_values);
 	
-		let colors = interpolateColors(color1, color2, max_iterations - min_iterations + 1);
+		let colors = interpolateColors(color1, color2, most_iterations - least_iterations + 1);
 		
-		//console.log(colors);	
 		for (let iterVal of unique_values) {
-			iterToColor[iterVal] = colors[iterVal - min_iterations]
+			iterToColor[iterVal] = colors[iterVal - least_iterations]
 		} 			
 	}  
 	return iterToColor;
@@ -127,7 +132,7 @@ function drawFullImage(px_values, iterToColor) {
     const ctx = canvas.getContext('2d');
     const height_px = canvas.height;
     const width_px = canvas.width;
-    const height_screen = (width_screen * height_px) / width_px;
+    const height_screen = (state.width_screen * height_px) / width_px;
 
 	let setColor = hexToRgb(document.getElementById('in-set-color').value);
 
@@ -154,47 +159,18 @@ function drawFullImage(px_values, iterToColor) {
 }
 
 
-
-function drawImage(px_values, iterToColor) {
-	let startTime = new Date().getTime();
-
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const height_px = canvas.height;
-    const width_px = canvas.width;
-    const height_screen = (width_screen * height_px) / width_px;
-
-	let setColor = hexToRgb(document.getElementById('in-set-color').value);
-    for (let r = 0; r < height_px; r++) {
-    	for (let c = 0; c < width_px; c++) {
-            let iters = px_values[r][c]; 
-
-			if (iters == null) {
-                draw_pixel(ctx, setColor, r, c);
-            } else {
-				//console.log('here');
-                draw_pixel(ctx, iterToColor[iters], r, c);
-            }
-        }
-    }
-
-	let endTime = new Date().getTime();
-	console.log('drawImage time', (endTime - startTime));
-}
-
 // assumes existence of ul_screen and width_screen
 function pixel_to_point(pixel) {
     const canvas = document.getElementById('canvas');
     const height_px = canvas.height;
     const width_px = canvas.width;
-    const height_screen = (width_screen * height_px) / width_px;
+    const height_screen = (state.width_screen * height_px) / width_px;
 
     let {r, c} = pixel;
-    let x = ul_screen.x + (c / width_px) * width_screen;
-    let y = ul_screen.y - (r / height_px) * height_screen;
+    let x = state.ul_screen.x + (c / width_px) * state.width_screen;
+    let y = state.ul_screen.y - (r / height_px) * height_screen;
     return {x, y}
 }
-
 
 
 function updateZoom(center_px, new_screen_width) {
@@ -202,24 +178,23 @@ function updateZoom(center_px, new_screen_width) {
     const height_px = canvas.height;
     const width_px = canvas.width;
 
-    console.log(center_px);
     // get cartesian coords of new center
     let center = pixel_to_point({ r: center_px.r, c: center_px.c}); 
-
-    //console.log(center);
-    // compute new width and height screen on plane
-    width_screen = new_screen_width;
-    //console.log(width_screen);
+    console.log('center point', center);
     
-    const height_screen = (width_screen * height_px) / width_px;
-    //console.log(height_screen);
+	// compute new width and height screen on plane
+    state.width_screen = new_screen_width;
+    console.log('width', state.width_screen);
+    
+    const height_screen = (state.width_screen * height_px) / width_px;
+    console.log('height', height_screen);
    
     // set ul_screen to center - 1/2 width
-    ul_screen = {
-        x: center.x - width_screen / 2,
+    state.ul_screen = {
+        x: center.x - state.width_screen / 2,
         y: center.y + height_screen / 2,
     }
-    //console.log(ul_screen);
+    console.log('upper left corner', state.ul_screen);
     animate();
 
 }
@@ -229,40 +204,12 @@ function pixel_to_point(pixel) {
     const canvas = document.getElementById('canvas');
     const height_px = canvas.height;
     const width_px = canvas.width;
-    const height_screen = (width_screen * height_px) / width_px;
+    const height_screen = (state.width_screen * height_px) / width_px;
 
     let {r, c} = pixel;
-    let x = ul_screen.x + (c / width_px) * width_screen;
-    let y = ul_screen.y - (r / height_px) * height_screen;
+    let x = state.ul_screen.x + (c / width_px) * state.width_screen;
+    let y = state.ul_screen.y - (r / height_px) * height_screen;
     return {x, y}
-}
-
-
-
-function updateZoom(center_px, new_screen_width) {
-    const canvas = document.getElementById('canvas');
-    const height_px = canvas.height;
-    const width_px = canvas.width;
-
-    //console.log(center_px);
-    // get cartesian coords of new center
-    let center = pixel_to_point({ r: center_px.r, c: center_px.c}); 
-
-    console.log(center);
-    // compute new width and height screen on plane
-    width_screen = new_screen_width;
-    console.log(width_screen);
-    
-    const height_screen = (width_screen * height_px) / width_px;
-    console.log(height_screen);
-   
-    // set ul_screen to center - 1/2 width
-    ul_screen = {
-        x: center.x - width_screen / 2,
-        y: center.y + height_screen / 2,
-    }
-    console.log(ul_screen);
-    animate();
 }
 
 
@@ -272,7 +219,7 @@ function zoomInHandler() {
     const width_px = canvas.width;
 
     let center_px = { r: height_px / 2, c: width_px / 2 }; 
-    updateZoom(center_px, width_screen / 2);
+    updateZoom(center_px, state.width_screen / 2);
 }
 
 function zoomOutHandler() {
@@ -281,7 +228,26 @@ function zoomOutHandler() {
     const width_px = canvas.width;
 
     let center_px = { r: height_px / 2, c: width_px / 2 }; 
-    updateZoom(center_px, width_screen * 2);
+    updateZoom(center_px, state.width_screen * 2);
+}
+
+function setTypeHandler() {
+	if (document.getElementById('mandelbrot').checked) {
+		// grey out julia
+		state.set_estimator_function = mandelbrot_estimator
+	} else {
+		state.set_estimator_function = julia_estimator
+		let c_x = parseInt(document.getElementById('julia-c-re').value);
+		let c_y = parseInt(document.getElementById('julia-c-im').value);
+		state.julia.C = { 
+            x: getFloat('julia-c-re'),
+            y: getFloat('julia-c-im')
+        };
+		state.julia.R = juliaR(state.julia.C);
+		console.log(state.julia.C);
+	}
+
+	animate();
 }
 
 function canvasClickHandler(e) {
@@ -290,13 +256,12 @@ function canvasClickHandler(e) {
     const width_px = canvas.width;
 
     let center_px = { r: e.clientY, c: e.clientX };
-    updateZoom(center_px, width_screen / 2);
+    updateZoom(center_px, state.width_screen / 2);
 }
+
 
 // numColors must be >= 2
 function interpolateColors(color1, color2, numColors) {
-	console.log('numColors' + numColors);
-
 	let rDiff = (color2.r - color1.r) / (numColors - 1);
 	let gDiff = (color2.g - color1.g) / (numColors - 1);
 	let bDiff = (color2.b - color1.b) / (numColors - 1);
@@ -334,4 +299,20 @@ window.onload = function() {
     document.getElementById('in-set-color').onchange = animate;
     document.getElementById('out-set-color1').onchange = animate;
     document.getElementById('out-set-color2').onchange = animate;
+    
+	document.getElementById('max-iterations').onchange = function() {
+		state.max_iterations = getInt('max-iterations');
+		animate();
+	}
+    
+	document.getElementById('mandelbrot').onchange = setTypeHandler;
+	document.getElementById('julia').onchange = setTypeHandler;
+	document.getElementById('julia-c-re').onchange = function() {
+        state.julia.C.x = getFloat('julia-c-re');
+        animate();
+    };
+	document.getElementById('julia-c-im').onchange =  function() {
+        state.julia.C.y = getFloat('julia-c-im');
+        animate();
+    };
 }

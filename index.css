@@ -1,5 +1,40 @@
 
+.canvas-container{
+    position: relative;
+    width: 800px;
+    height: 800px;
+}
+
 canvas {
+    position: absolute;
     border: 1px grey solid;
     border-radius: 5px;
+    cursor: pointer;
+}
+
+.canvas-container > .zoom-buttons {
+    right: 5px;
+    bottom: 5px;
+    position:absolute;
+    z-index: 1;
+}
+
+.canvas-container > .zoom-buttons > button {
+    width: 2em;
+    font-size: large;
+    font-weight: bold;
+    display: block;
+    margin: 3px;
+}
+
+.julia-c {
+    width: 5em;
+}
+
+#julia-controls {
+    margin-top: 10px;
+}
+
+#julia-controls > label {
+    margin-right: 20px;
 }

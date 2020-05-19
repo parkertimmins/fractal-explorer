@@ -3,28 +3,61 @@
         <link rel="stylesheet" type="text/css" href="index.css">
     </head>
     <body>
-        <canvas id='canvas' height="800px" width="800px"></canvas>
-        <button id="zoom-in">+</button>
-        <button id="zoom-out">-</button>
+        <div class="canvas-container">
+            <canvas id='canvas' height="800px" width="800px"></canvas>
+            <div class="zoom-buttons">
+                <button id="zoom-in">+</button>
+                <button id="zoom-out">-</button>
+            </div>
+        </div>
        
         <div>
+            <label for="max-iterations" title="Higher numbers will be more detailed, but will take longer">
+                <input type="number" id="max-iterations" name="max-iterations" min="10" max="5000" value="200">
+                Max Iterations
+            </label>
+            
+            
             <div>
-                <input type="color" id="in-set-color" name="in-set-color" value="#000000">
-                <label for="in-set-color">Set Color</label>
+                <label for="in-set-color" title="Points that are in the set are colored with that value">
+                    <input type="color" id="in-set-color" name="in-set-color" value="#000000">
+                    Set Color
+                </label>
+            </div>
+            <div>
+                <label for="out-set-color2" title="Points that take the most iterations to be clear are not in the set">
+                    <input type="color" id="out-set-color2" name="out-set-color2" value="#703cf6">
+                    Color Range Start
+                </label>
+            </div>
+            <div>
+                <label for="out-set-color1" title="Points that take the least iterations to be clear are not in the set">
+                    <input type="color" id="out-set-color1" name="out-set-color1" value="#89d3c7">
+                    Color Range End
+                </label>
             </div>
 
             <div>
-                <input type="color" id="out-set-color1" name="out-set-color1" value="#89d3c7">
-                <label for="out-set-color1">Out of set Color 1</label>
-            </div>
+                <label for="mandelbrot">
+                    <input type="radio" id="mandelbrot" name="set-type" value="mandelbrot" checked>
+                    Mandelbrot
+                </label>
+               
+                <div id="julia-controls"> 
+                    <label for="julia">
+                        <input type="radio" id="julia" name="set-type" value="julia">
+                        Julia
+                    </label>
 
-            <div>
-                <input type="color" id="out-set-color2" name="out-set-color2" value="#703cf6">
-                <label for="out-set-color2">Out of set Color 2</label>
-            </div>
-
-            <div id="color-test">
-
+                    <label for="julia-c-re" title="The real part of in c of the function f(z)=z^2 + c">
+                        Re(c)
+                        <input type="number"step="0.001" class="julia-c" id="julia-c-re" name="julia-c-re" value="0.285">
+                    </label>
+                    <label for="julia-c-im" title="The imaginary part of in c of the function f(z)=z^2 + c">
+                        Im(c)
+                        <input type="number"step="0.001" class="julia-c" id="julia-c-im" name="julia-c-im" value="0.01">
+                    </label>
+                <div> 
             </div>
         </div>
 
