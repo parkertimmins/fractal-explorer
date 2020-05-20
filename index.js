@@ -1,8 +1,10 @@
 
-let juliaC = {
-	x: getFloat('julia-c-re'),
-	y: getFloat('julia-c-im')
-};	
+// global state 
+const state = {
+	ul_screen: { x: -1.5, y: 1.5 },
+	width_screen: 3,
+}
+
 
 function getInt(id) {
 	return parseInt(document.getElementById(id).value);
@@ -12,14 +14,26 @@ function getFloat(id) {
 	return parseFloat(document.getElementById(id).value);
 }
 
-let state = {
-	ul_screen: { x: -1.5, y: 1.5 },
-	width_screen: 3,
-	set_estimator_function: mandelbrot_estimator,
-	max_iterations: getInt('max-iterations'),
-	julia: {
-		C: juliaC,
-		R: juliaR(juliaC)
+function getColor(id) {
+	return hexToRgb(document.getElementById(id).value);
+}
+
+function getUIParameters() {
+	const C = {
+		x: getFloat('julia-c-re'),
+		y: getFloat('julia-c-im')
+	}
+
+	return {
+		max_iterations: getInt('max-iterations'),
+		in_set_color: getColor('in-set-color'),
+		out_set_color1: getColor('out-set-color1'),
+		out_set_color2: getColor('out-set-color2'),
+		is_mandelbrot: document.getElementById('mandelbrot').checked, 
+		julia: {
+			C,
+			R: juliaR(C)
+		}
 	}
 }
 
@@ -41,7 +55,6 @@ function f(z, c) {
 // returns num iteration to find not in set, or null if in set
 function in_set_estimator(start, update_func, threshold, max_iter) {
     let z = start;
-	
     for (let i = 0; i < max_iter; i++) {
         z = update_func(z) 
         if (norm(z) > threshold) {
@@ -51,15 +64,15 @@ function in_set_estimator(start, update_func, threshold, max_iter) {
     return null;
 }
 
-function mandelbrot_estimator(c) {
-    return in_set_estimator({x: 0, y:0}, f_n_0 => f(f_n_0, c), 2, state.max_iterations);
+function mandelbrot_estimator(params, c) {
+    return in_set_estimator({x: 0, y:0}, f_n_0 => f(f_n_0, c), 2, params.max_iterations);
 }
 
-function julia_estimator(z) {
-    return in_set_estimator(z, z => f(z, state.julia.C), state.julia.R, state.max_iterations); 
+function julia_estimator(params, z) {
+    return in_set_estimator(z, z => f(z, params.julia.C), params.julia.R, params.max_iterations); 
 }
 
-function compute_pixel_values() {
+function compute_pixel_values(params) {
 	let startTime = new Date().getTime();
 
 	const canvas = document.getElementById('canvas');
@@ -71,11 +84,12 @@ function compute_pixel_values() {
 	let px_values = [];
 	let unique_values = new Set();
 
+	const set_estimator_function = params.is_mandelbrot ? mandelbrot_estimator : julia_estimator; 
     for (let r = 0; r < height_px; r++) {
 		let row = []
     	for (let c = 0; c < width_px; c++) {
             let z = pixel_to_point({r, c}); 
-            let iterations_to_escape = state.set_estimator_function(z)
+            let iterations_to_escape = set_estimator_function(params, z)
 				
 			row.push(iterations_to_escape);           	
 			
@@ -92,19 +106,21 @@ function compute_pixel_values() {
 	return [px_values, unique_values];
 }
 
-function animate() {
+function render() {
+	const params = getUIParameters();
+	console.log('UI Parameters', params);
+
 	let startTime = new Date().getTime();
 
-	let [px_values, unique_values] = compute_pixel_values();
+	let [px_values, unique_values] = compute_pixel_values(params);
+	let iterToColor = getIterationToColor(params.out_set_color1, params.out_set_color2, unique_values);
 	
-	let color1 = hexToRgb(document.getElementById('out-set-color1').value);
-	let color2 = hexToRgb(document.getElementById('out-set-color2').value);
-	let iterToColor = getIterationToColor(color1, color2, unique_values);
+	drawFullImage(px_values, params.in_set_color, iterToColor);
 	
-	drawFullImage(px_values, iterToColor);
+	save_settings_to_url();
 	
 	let endTime = new Date().getTime();
-	console.log('animate() time', (endTime - startTime));
+	console.log('render() time', (endTime - startTime));
 }
 
 function getIterationToColor(color1, color2, unique_values) {
@@ -125,7 +141,7 @@ function getIterationToColor(color1, color2, unique_values) {
 	return iterToColor;
 }
 
-function drawFullImage(px_values, iterToColor) {
+function drawFullImage(px_values, inSetColor, iterToColor) {
 	let startTime = new Date().getTime();
 
     const canvas = document.getElementById('canvas');
@@ -134,15 +150,13 @@ function drawFullImage(px_values, iterToColor) {
     const width_px = canvas.width;
     const height_screen = (state.width_screen * height_px) / width_px;
 
-	let setColor = hexToRgb(document.getElementById('in-set-color').value);
-
 	let data = new Uint8ClampedArray(width_px * height_px * 4); 
    
 	let i = 0; 
 	for (let r = 0; r < height_px; r++) {
     	for (let c = 0; c < width_px; c++) {
             let iters = px_values[r][c]; 
-			let color = iters === null ? setColor : iterToColor[iters];
+			let color = iters === null ? inSetColor : iterToColor[iters];
 			data[i++] = color.r;
 			data[i++] = color.g;
 			data[i++] = color.b;
@@ -178,6 +192,7 @@ function updateZoom(center_px, new_screen_width) {
     const height_px = canvas.height;
     const width_px = canvas.width;
 
+    console.log('center pixel', center_px);
     // get cartesian coords of new center
     let center = pixel_to_point({ r: center_px.r, c: center_px.c}); 
     console.log('center point', center);
@@ -195,7 +210,7 @@ function updateZoom(center_px, new_screen_width) {
         y: center.y + height_screen / 2,
     }
     console.log('upper left corner', state.ul_screen);
-    animate();
+    render();
 
 }
 
@@ -219,43 +234,35 @@ function zoomInHandler() {
     const width_px = canvas.width;
 
     let center_px = { r: height_px / 2, c: width_px / 2 }; 
-    updateZoom(center_px, state.width_screen / 2);
+    updateZoom(center_px, state.width_screen / Math.sqrt(2));
 }
 
 function zoomOutHandler() {
     const canvas = document.getElementById('canvas');
-    const height_px = canvas.height;
+    
+	const height_px = canvas.height;
     const width_px = canvas.width;
 
     let center_px = { r: height_px / 2, c: width_px / 2 }; 
-    updateZoom(center_px, state.width_screen * 2);
+    updateZoom(center_px, state.width_screen * Math.sqrt(2));
 }
 
-function setTypeHandler() {
-	if (document.getElementById('mandelbrot').checked) {
-		// grey out julia
-		state.set_estimator_function = mandelbrot_estimator
-	} else {
-		state.set_estimator_function = julia_estimator
-		let c_x = parseInt(document.getElementById('julia-c-re').value);
-		let c_y = parseInt(document.getElementById('julia-c-im').value);
-		state.julia.C = { 
-            x: getFloat('julia-c-re'),
-            y: getFloat('julia-c-im')
-        };
-		state.julia.R = juliaR(state.julia.C);
-		console.log(state.julia.C);
-	}
-
-	animate();
+function disableJuliaCInputs(disable) {
+	document.getElementById('julia-c-re').disabled = disable;
+	document.getElementById('julia-c-im').disabled = disable;
 }
 
 function canvasClickHandler(e) {
     const canvas = document.getElementById('canvas');
+    const rect = canvas.getBoundingClientRect()
     const height_px = canvas.height;
     const width_px = canvas.width;
 
-    let center_px = { r: e.clientY, c: e.clientX };
+    let center_px = { 
+        r: event.clientY - rect.top, 
+        c: event.clientX - rect.left 
+    }
+    console.log('clicked pixel', center_px);
     updateZoom(center_px, state.width_screen / 2);
 }
 
@@ -279,6 +286,14 @@ function interpolateColors(color1, color2, numColors) {
 	return colors;	
 }
 
+function componentToHex(c) {
+  var hex = c.toString(16);
+  return hex.length == 1 ? "0" + hex : hex;
+}
+function rgbToHex(color) {
+  return "#" + componentToHex(color.r) + componentToHex(color.g) + componentToHex(color.b);
+}
+
 function hexToRgb(hex) {
   var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? {
@@ -288,31 +303,89 @@ function hexToRgb(hex) {
   } : null;
 }
 
+function downloadImageHandler() {
+    const canvas = document.getElementById("canvas");
+    const button = document.getElementById('download-image');
+    const img = canvas.toDataURL("image/png");
+    button.href = img;
+}
+
+function load_settings_from_url() {
+    const settings_str = window.location.hash.substring(1);
+
+    const settings = {}
+    settings_str.split('&')
+        .map(param => param.split('=').map(decodeURIComponent))
+        .forEach(([name, value]) => {
+        	settings[name] = value; 
+        })
+
+	console.log("url params", settings);
+
+	// state
+	if (settings.ul_screen_x) state.ul_screen.x = parseFloat(settings.ul_screen_x)
+	if (settings.ul_screen_y) state.ul_screen.y = parseFloat(settings.ul_screen_y)
+	if (settings.width_screen) state.width_screen = parseFloat(settings.width_screen)
+	
+	// ui	
+	if (settings.julia_c_x) document.getElementById("julia-c-re").value = parseFloat(settings.julia_c_x)
+	if (settings.julia_c_y) document.getElementById("julia-c-im").value = parseFloat(settings.julia_c_y)
+	if (settings.max_iterations) document.getElementById("max-iterations").value = parseFloat(settings.max_iterations)
+	if (settings.in_set_color) document.getElementById("in-set-color").value = settings.in_set_color
+	if (settings.out_set_color1) document.getElementById("out-set-color1").value = settings.out_set_color1
+	if (settings.out_set_color2) document.getElementById("out-set-color2").value = settings.out_set_color2	
+
+	
+	const is_mandelbrot = JSON.parse(settings.is_mandelbrot)
+	document.getElementById("mandelbrot").checked = is_mandelbrot
+	document.getElementById("julia").checked = !is_mandelbrot
+	disableJuliaCInputs(is_mandelbrot)
+
+	console.log('mandelbrot', settings.is_mandelbrot);
+
+	//if (settings.is_mandelbrot) document.getElementById("julia").checked = JSON.parse(settings.is_mandelbrot)
+}
+
+
+function save_settings_to_url() {
+    const setting_pairs = [];
+
+	//state
+	setting_pairs.push(['ul_screen_x', state.ul_screen.x])
+	setting_pairs.push(['ul_screen_y', state.ul_screen.y])
+	setting_pairs.push(['width_screen', state.width_screen])
+	
+	// ui params			
+	const params = getUIParameters();
+	setting_pairs.push(['julia_c_x', params.julia.C.x]) 
+	setting_pairs.push(['julia_c_y', params.julia.C.y]) 
+	setting_pairs.push(['max_iterations', params.max_iterations]) 
+	setting_pairs.push(['in_set_color', rgbToHex(params.in_set_color)]) 
+	setting_pairs.push(['out_set_color1', rgbToHex(params.out_set_color1)]) 
+	setting_pairs.push(['out_set_color2', rgbToHex(params.out_set_color2)]) 
+	setting_pairs.push(['is_mandelbrot', params.is_mandelbrot])
+    
+	const settings_str = setting_pairs
+        .map(pair => pair.map(encodeURIComponent).join("="))
+        .join("&")
+
+    window.location.hash = "#" + settings_str
+}
+
 
 window.onload = function() {
-    animate();
+	load_settings_from_url();
+    render();
 
-    document.getElementById('canvas').onclick = canvasClickHandler;
+	document.getElementById('mandelbrot').addEventListener('change', () => disableJuliaCInputs(true));
+	document.getElementById('julia').addEventListener('change', () => disableJuliaCInputs(false));
+
+	document.querySelectorAll('.redraw').forEach(function(element) {
+		element.addEventListener('change', render);
+	});
+
+	document.getElementById('canvas').onclick = canvasClickHandler;
     document.getElementById('zoom-in').onclick = zoomInHandler;
     document.getElementById('zoom-out').onclick = zoomOutHandler;
-    
-    document.getElementById('in-set-color').onchange = animate;
-    document.getElementById('out-set-color1').onchange = animate;
-    document.getElementById('out-set-color2').onchange = animate;
-    
-	document.getElementById('max-iterations').onchange = function() {
-		state.max_iterations = getInt('max-iterations');
-		animate();
-	}
-    
-	document.getElementById('mandelbrot').onchange = setTypeHandler;
-	document.getElementById('julia').onchange = setTypeHandler;
-	document.getElementById('julia-c-re').onchange = function() {
-        state.julia.C.x = getFloat('julia-c-re');
-        animate();
-    };
-	document.getElementById('julia-c-im').onchange =  function() {
-        state.julia.C.y = getFloat('julia-c-im');
-        animate();
-    };
+    document.getElementById('download-image').onclick = downloadImageHandler;
 }

@@ -1,14 +1,39 @@
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: silver;
+}
 
-.canvas-container{
+.controls {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px;
+}
+
+.canvas-container {
     position: relative;
     width: 800px;
     height: 800px;
+    background: white;
+    filter: drop-shadow(0 0 0.75rem black);
+}
+
+.button {
+    font: bold 11px Arial;
+    text-decoration: none;
+    color: #333333;
+    padding: 5px 10px;
+    border-radius: 1px;
+    border: 1px solid grey;
+}
+
+.button:hover {
+    background: darkgray;
 }
 
 canvas {
     position: absolute;
-    border: 1px grey solid;
-    border-radius: 5px;
     cursor: pointer;
 }
 
@@ -17,6 +42,17 @@ canvas {
     bottom: 5px;
     position:absolute;
     z-index: 1;
+}
+
+input:checked {
+    background: green;
+}
+
+.zoom-buttons {
+    opacity: 0.4;
+}
+.zoom-buttons:hover {
+    opacity: 1;
 }
 
 .canvas-container > .zoom-buttons > button {
@@ -31,10 +67,14 @@ canvas {
     width: 5em;
 }
 
-#julia-controls {
-    margin-top: 10px;
-}
-
 #julia-controls > label {
     margin-right: 20px;
+}
+
+.function-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    justify-content: space-around;
+
 }
