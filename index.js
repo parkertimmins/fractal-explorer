@@ -311,67 +311,48 @@ function downloadImageHandler() {
 }
 
 function load_settings_from_url() {
-    const settings_str = window.location.hash.substring(1);
-
-    const settings = {}
-    settings_str.split('&')
-        .map(param => param.split('=').map(decodeURIComponent))
-        .forEach(([name, value]) => {
-        	settings[name] = value; 
-        })
-
-	console.log("url params", settings);
+    const settings = new URLSearchParams(window.location.hash.slice(1))
 
 	// state
-	if (settings.ul_screen_x) state.ul_screen.x = parseFloat(settings.ul_screen_x)
-	if (settings.ul_screen_y) state.ul_screen.y = parseFloat(settings.ul_screen_y)
-	if (settings.width_screen) state.width_screen = parseFloat(settings.width_screen)
+	if (settings.has('ul_screen_x')) state.ul_screen.x = parseFloat(settings.get('ul_screen_x'))
+	if (settings.has('ul_screen_y')) state.ul_screen.y = parseFloat(settings.get('ul_screen_y'))
+	if (settings.has('width_screen')) state.width_screen = parseFloat(settings.get('width_screen'))
 	
 	// ui	
-	if (settings.julia_c_x) document.getElementById("julia-c-re").value = parseFloat(settings.julia_c_x)
-	if (settings.julia_c_y) document.getElementById("julia-c-im").value = parseFloat(settings.julia_c_y)
-	if (settings.max_iterations) document.getElementById("max-iterations").value = parseFloat(settings.max_iterations)
-	if (settings.in_set_color) document.getElementById("in-set-color").value = settings.in_set_color
-	if (settings.out_set_color1) document.getElementById("out-set-color1").value = settings.out_set_color1
-	if (settings.out_set_color2) document.getElementById("out-set-color2").value = settings.out_set_color2	
+	if (settings.has('julia_c_x')) document.getElementById("julia-c-re").value = parseFloat(settings.get('julia_c_x'))
+	if (settings.has('julia_c_y')) document.getElementById("julia-c-im").value = parseFloat(settings.get('julia_c_y'))
+	if (settings.has('max_iterations')) document.getElementById("max-iterations").value = parseFloat(settings.get('max_iterations'))
+	if (settings.has('in_set_color')) document.getElementById("in-set-color").value = settings.get('in_set_color')
+	if (settings.has('out_set_color1')) document.getElementById("out-set-color1").value = settings.get('out_set_color1')
+	if (settings.has('out_set_color2')) document.getElementById("out-set-color2").value = settings.get('out_set_color2')
 
-	
-	const is_mandelbrot = JSON.parse(settings.is_mandelbrot)
+	const is_mandelbrot = settings.has("is_mandelbrot") ? JSON.parse(settings.get('is_mandelbrot')) : true
 	document.getElementById("mandelbrot").checked = is_mandelbrot
 	document.getElementById("julia").checked = !is_mandelbrot
 	disableJuliaCInputs(is_mandelbrot)
-
-	console.log('mandelbrot', settings.is_mandelbrot);
-
-	//if (settings.is_mandelbrot) document.getElementById("julia").checked = JSON.parse(settings.is_mandelbrot)
 }
 
 
 function save_settings_to_url() {
-    const setting_pairs = [];
+    const urlParams = new URLSearchParams()
 
 	//state
-	setting_pairs.push(['ul_screen_x', state.ul_screen.x])
-	setting_pairs.push(['ul_screen_y', state.ul_screen.y])
-	setting_pairs.push(['width_screen', state.width_screen])
+	urlParams.set('ul_screen_x', state.ul_screen.x)
+	urlParams.set('ul_screen_y', state.ul_screen.y)
+	urlParams.set('width_screen', state.width_screen)
 	
 	// ui params			
 	const params = getUIParameters();
-	setting_pairs.push(['julia_c_x', params.julia.C.x]) 
-	setting_pairs.push(['julia_c_y', params.julia.C.y]) 
-	setting_pairs.push(['max_iterations', params.max_iterations]) 
-	setting_pairs.push(['in_set_color', rgbToHex(params.in_set_color)]) 
-	setting_pairs.push(['out_set_color1', rgbToHex(params.out_set_color1)]) 
-	setting_pairs.push(['out_set_color2', rgbToHex(params.out_set_color2)]) 
-	setting_pairs.push(['is_mandelbrot', params.is_mandelbrot])
+	urlParams.set('julia_c_x', params.julia.C.x) 
+	urlParams.set('julia_c_y', params.julia.C.y) 
+	urlParams.set('max_iterations', params.max_iterations) 
+	urlParams.set('in_set_color', rgbToHex(params.in_set_color)) 
+	urlParams.set('out_set_color1', rgbToHex(params.out_set_color1)) 
+	urlParams.set('out_set_color2', rgbToHex(params.out_set_color2)) 
+	urlParams.set('is_mandelbrot', params.is_mandelbrot)
     
-	const settings_str = setting_pairs
-        .map(pair => pair.map(encodeURIComponent).join("="))
-        .join("&")
-
-    window.location.hash = "#" + settings_str
+    window.location.hash = urlParams.toString() 
 }
-
 
 window.onload = function() {
 	load_settings_from_url();
